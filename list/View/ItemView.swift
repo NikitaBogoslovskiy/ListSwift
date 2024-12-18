@@ -7,20 +7,59 @@
 
 import Foundation
 import SwiftUI
+import CoreData
 
 struct ItemView: View {
     var id: Int
     @ObservedObject var listController: ListController
     @State var content: ItemDetails = ItemDetails()
+    @State var hasConnection = true
+    @Environment(\.managedObjectContext) private var viewContext
     
     var body: some View {
-        ItemDetailsView(content: content)
+        ItemDetailsViewWrapper(content: content, hasConnection: hasConnection)
         .task {
             do {
-                content = try await listController.getItem(id: id)
+                do {
+                    let results = try viewContext.fetch(NSFetchRequest(entityName: "ItemDetailsData")) as [ItemDetailsEntity]
+                    let stringId = String(self.id)
+                    let result = results.filter { entity in entity.entityId == stringId }.first
+                    if result == nil {
+                        print("No offline data")
+                        throw NoDataError("")
+                    }
+                    content = ItemDetails.fromNS(entity: result!)
+                    print("Loaded offline data")
+                } catch {
+                    content = try await listController.getItem(id: id)
+                    print("Loaded online data")
+                    var newEntity = ItemDetailsEntity(context: viewContext)
+                    content.toNS(result: &newEntity)
+                    do {
+                        try viewContext.save()
+                    } catch {
+                        let nsError = error as NSError
+                        fatalError("Unresolved error \(nsError), \(nsError.userInfo)")
+                    }
+                    hasConnection = true
+                }
             } catch {
-                
+                hasConnection = false
+                print("No internet")
             }
+        }
+    }
+}
+
+struct ItemDetailsViewWrapper: View {
+    var content: ItemDetails
+    var hasConnection: Bool
+    
+    var body: some View {
+        if hasConnection {
+            ItemDetailsView(content: content)
+        } else {
+            Text("No internet")
         }
     }
 }

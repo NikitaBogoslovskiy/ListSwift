@@ -10,13 +10,11 @@ import SwiftUI
 @main
 struct listApp: App {
     let persistenceController = PersistenceController.shared
-    @State private var networkMonitor = NetworkMonitor()
 
     var body: some Scene {
         WindowGroup {
             ListView(listController: ListController.shared)
-                .environment(networkMonitor)
-                //.environment(\.managedObjectContext, persistenceController.container.viewContext)
+                .environment(\.managedObjectContext, persistenceController.container.viewContext)
         }
     }
 }
